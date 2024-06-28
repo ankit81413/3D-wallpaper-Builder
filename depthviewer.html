@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Change Range Input Value</title>
+</head>
+<body>
+
+<input type="range" id="myRange" min="0" max="100" value="50">
+<button onclick="changeValue()">ccccccccc</button>
+
+<script>
+// Get the range input element
+const rangeInput = document.getElementById('myRange');
+
+// Function to change the value
+function changeValue() {
+    // Update the value
+    rangeInput.value = 75; // Set any desired value here
+
+    // Dispatch an input event to ensure any attached listeners are notified of the change
+    rangeInput.dispatchEvent(new Event('input'));
+}
+
+// Call the function to change the value
+changeValue();
+</script>
+
+</body>
+</html>

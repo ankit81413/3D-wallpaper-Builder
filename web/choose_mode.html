@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Choose mode</title>
+    <script type="text/javascript" src="/eel.js"></script>
+</head>
+
+<style>
+    body{
+        background-color: rgb(233, 234, 255);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+
+    button{
+        background-color: white;
+        border: 3px solid black;
+        padding: 10px;
+        border-radius: 10px;
+        font-size: 15px;
+        font-weight: bold;
+        margin: 6px;
+    }
+</style>
+<body>
+    <h1>Choose Mode</h1>
+    <div>
+        <button onclick="savemode()">SAVE MODE</button>
+        <button onclick="massproduction()">MASS PRODUCTION</button>    
+    </div>
+</body>
+
+<script>
+
+function savemode(){
+    eel.choosemode("save")
+    window.location.href = "index.html"
+}
+
+function massproduction(){
+    eel.choosemode("mass")
+    window.location.href = "index.html"
+}
+</script>
+
+
+</html>

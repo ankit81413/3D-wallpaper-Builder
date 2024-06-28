@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.0/FileSaver.min.js"></script>
+  <title>Depth Map Image Viewer</title>
+  <script type="text/javascript" src="/eel.js"></script>
+  <style>
+    canvas {
+      display: none;
+      /* Hide the canvas initially */
+    }
+
+    #container {
+      border: 2px solid red;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Depth Map Image Viewer</h1>
+  <label for="depthFile">Choose a depth map:</label>
+  <input type="file" id="depthFile" accept="image/*">
+  <br><br>
+  <label for="colorFile">Choose a color image:</label>
+  <input type="file" id="colorFile" accept="image/*">
+  <br><br>
+  <button id="loadImages" onclick="loadimagestart()">Load Images</button>
+  <button id="rotateLeft">Rotate Left</button>
+  <button id="rotateRight">Rotate Right</button>
+  <button id="fullScreen">Fullscreen</button>
+  <button id="getdata" onclick="getdata()">GET DATA</button>
+  <button id="save_btn" onclick="save()">SAVE</button>
+  <button id="reload" onclick="reload()">RELOAD</button>
+  <button id="massproduction" onclick="massproduction()">MASS PRODUCTION</button>
+  <!-- <image id="ddeepp" style="width: 100px;" src=""></image>
+  <image id="ddeepp2" style="width: 100px;" src=""></image> -->
+  <h1>Adjusts</h1><br>
+
+  <label for="depthRange">Adjust depth:</label>
+  <input type="range" id="depthRange" min="0" max="10" step="0.01" value="3.42" style="width:800px"><!--DEPTH--> <br>
+
+  <label for="bendRangeX">Adjust bend:</label>
+  <input type="range" id="bendRangeX" min="-2" max="1" step="0.001" value="0" style="width:800px"><!--BEND--> <br>
+
+  <label for="cam">Adjust Cam z:</label>
+  <input type="range" id="cam" min="-1" max="30" step="0.01" value="14" style="width:800px"><!--Z CAM--> <br>
+  <label for="time">Adjust Time:</label>
+  <input type="range" id="time" min="0" max="0.3" step="0.00001" value="0.05" style="width:800px"><!--RADIUS--> <br>
+
+  <label for="radiusRange">Adjust Radius:</label>
+  <input type="range" id="radiusRange" min="0" max="0.5" step="0.00001" value="0.145" style="width:800px"><!--RADIUS-->
+  <br>
+
+  <button onclick="startrec()">START REC</button> <br>
+
+  <label for="lookat">Adjust lookat:</label>
+  <input type="range" id="lookat" min="-3" max="3" step="0.001" value="0.612" style="width:800px"><!--LOOKAT--> <br>
+
+
+
+  <div id="container"></div>
+  <!-- <input type="range" id="bendRangeY" min="-1" max="1" step="0.01" value="0"> -->
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    let scene, camera, renderer;
+    let depthTexture, colorTexture, plane;
+    let depthValue = 3.42; // Default depth value
+    // let bendValueX = -0.33; // Default bend value along x-axis
+    // let bendValueY = -0.33; // Default bend value along y-axis
+    let bendValueX = 0; // Default bend value along x-axis
+    let bendValueY = 0; // Default bend value along y-axis
+    let aspectRatio = 9 / 9;
+    let angle = 0; // Initialize angle for circular motion
+
+    let camz = 14;
+
+    let radius = 0.145; // Initialize radius
+
+    let targetZ = 0.612;
+
+    let quality = 1920;
+
+    let mode = "save"
+
+    let present_json;
+
+
+
+
+
+
+    eel.getmode()(function (gmode) {
+      mode = gmode;
+      console.log(mode);
+    });
+
+
+
+
+
+
+
+    // next programming
+    var originaljson;
+
+    let retryCount = 0;
+
+    function loadJsonFilesWithRetries() {
+      if (retryCount < 3) {
+        console.log('try num ' + retryCount);
+        fetch("data.json")
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error('data.json - Network response was not OK');
+            }
+            return response.json();
+          })
+          .then((data) => {
+            originaljson = data;
+            console.log(originaljson);
+
+          })
+          .catch((error) => {
+            // Handle errors for the first JSON file
+            console.error("Error loading data.json:", error);
+            retryCount++; // Increment retry count
+            loadJsonFilesWithRetries(); // Retry loading the JSON files
+          });
+      } else {
+        // Show an alert if all retries fail
+        alert("Failed to load JSON files after 3 attempts");
+      }
+    }
+
+    // Start loading JSON files with retries
+    loadJsonFilesWithRetries();
+
+
+
+
+
+
+
+
+
+    function appendValuesToOriginalJson(depthnamearg, colorfilenamearg, depthValuearg, bendValueXarg, camzarg, updateanglearg, radiusarg, targetZarg) {
+      // Incrementing the index to append new data
+      const index = Object.keys(originaljson).length + 1;
+
+      let appendedjson = originaljson;
+
+      // Creating new entry with the provided values
+      const newData = {
+        depth_img: depthnamearg,
+        color_img: colorfilenamearg,
+        depth: depthValuearg,
+        bend: bendValueXarg,
+        camz: camzarg,
+        time: updateanglearg,
+        radius: radiusarg,
+        lookat: targetZarg
+      };
+
+      // Appending new data to the original JSON
+      appendedjson[index] = newData;
+
+      return appendedjson;
+    }
+
+
+
+
+
+
+
+
+    function save() {
+
+
+      const depthFilesend = document.getElementById('depthFile').files[0];
+      const colorFilesend = document.getElementById('colorFile').files[0];
+
+
+      let depthname = depthFilesend.name;
+      let colorfilename = colorFilesend.name;
+
+      depthValue = parseFloat(depthValue);
+      bendValueX = parseFloat(bendValueX);
+      camz = parseFloat(camz);
+
+
+      console.log("get data ");
+      console.log("DEPTH FILE : " + depthname);
+      console.log("COLOR IMAGE : " + colorfilename);
+      console.log("DEPTH : " + depthValue);
+      console.log("BEND : " + bendValueX);
+      console.log("CAMZ : " + camz);
+      console.log("TIME : " + updateangle);
+      console.log("RIDIUS : " + radius);
+      console.log("LOOKAT : " + targetZ);
+
+
+      let savable_json = appendValuesToOriginalJson(depthname, colorfilename, depthValue, bendValueX, camz, updateangle, radius, targetZ)
+
+
+
+      eel.save_data(savable_json);
+      console.log(savable_json);
+
+      console.log("eel called");
+      // is_saved = "yes";
+      originaljson = savable_json;
+      console.log(originaljson);
+      reload();
+
+    }
+
+
+    function reload() {
+      depthValue = 3.42;
+      bendValueX = 0;
+      bendValueY = 0;
+      camz = 14;
+      radius = 0.145;
+      targetZ = 0.612;
+      updateangle = 0.05;
+      updateDepth();
+      updateBend();
+      updateCamz();
+      document.getElementById("depthRange").value = depthValue;
+      document.getElementById("bendRangeX").value = bendValueX;
+      document.getElementById("cam").value = camz;
+      document.getElementById("time").value = updateangle;
+      document.getElementById("radiusRange").value = radius;
+      document.getElementById("lookat").value = targetZ;
+      eel.reload();
+      destroyScene();
+
+    }
+
+
+
+    // function destroyScene(scene, renderer) {
+    function destroyScene() {
+      // Remove all objects from the scene
+      scene.clear();
+
+      // Dispose of geometries, materials, and textures
+      scene.traverse(obj => {
+        if (obj.geometry) {
+          obj.geometry.dispose();
+        }
+        if (obj.material) {
+          if (Array.isArray(obj.material)) {
+            obj.material.forEach(material => {
+              material.dispose();
+            });
+          } else {
+            obj.material.dispose();
+          }
+        }
+        if (obj.texture) {
+          obj.texture.dispose();
+        }
+      });
+
+      // Remove all event listeners associated with the scene or objects
+      // (Make sure to remove event listeners that you've added during scene creation)
+
+      // Dispose of the WebGL renderer
+      renderer.dispose();
+
+      // Optionally, remove the canvas element from the DOM
+      const canvas = renderer.domElement;
+      if (canvas && canvas.parentNode) {
+        canvas.parentNode.removeChild(canvas);
+      }
+    }
+
+
+
+
+    function loadimagestart() {
+      const depthFile = document.getElementById('depthFile').files[0];
+      const colorFile = document.getElementById('colorFile').files[0];
+
+
+      loadimages(depthFile, colorFile)
+    }
+
+
+
+
+
+
+
+    function loadimages(gotdeth, gotimage) {
+
+      const depthFile = gotdeth;
+      const colorFile = gotimage;
+
+
+
+
+
+      // console.log("DEPPPPPPPPPPPPPTH :::::   "+colorFile.name);
+
+      if (depthFile && colorFile) {
+        const depthReader = new FileReader();
+        depthReader.onload = function () {
+          const colorReader = new FileReader();
+          colorReader.onload = function () {
+            var img = new Image();
+            img.src = colorReader.result;
+            img.onload = function () {
+              var width = this.naturalWidth;
+              var height = this.naturalHeight;
+              aspectRatio = width / height;
+              console.log("Color image dimensions - Width: " + width + "px, Height: " + height + "px");
+              init(depthReader.result, colorReader.result);
+              animate();
+            };
+          };
+          colorReader.readAsDataURL(colorFile);
+        };
+        depthReader.readAsDataURL(depthFile);
+      } else {
+        alert('Please select both depth map and color image.');
+      }
+    };
+
+
+
+
+
+
+
+
+    // document.getElementById('loadImages').addEventListener('click', () => {
+
+    function loadimagesviaurl(ddepthpath, iimagepath, callback) {
+      // const depthFile = "wallpapers\\car.jpg";
+      // const colorFile = "wallpapers\\depth.jpg";
+
+
+      // const depthFile = gotdeth;
+      // const colorFile = gotimage;
+
+      // let ddepthpath = "wallpapers\\depth.jpg";
+      // let ddepthpath = "wallpapers\\car.jpg";
+      // let iimagepath = "wallpapers\\car.jpg";
+
+      let ddepthimage = new Image();
+      ddepthimage.onload = function () {
+        ddepthimage.src = ddepthpath;
+      }
+
+      let colorimage = new Image();
+      colorimage.onload = function () {
+        colorimage.src = iimagepath;
+      }
+
+
+
+
+      var img = new Image();
+      img.src = iimagepath;
+      img.onload = function () {
+        var width = this.naturalWidth;
+        var height = this.naturalHeight;
+        aspectRatio = width / height;
+        console.log("Color image dimensions - Width: " + width + "px, Height: " + height + "px");
+        // init(depthReader.result, colorReader.result);
+        init(ddepthpath, iimagepath);
+        animate();
+        // callback()
+      }
+
+
+    };
+    // });
+
+
+
+
+
+
+
+    document.getElementById('rotateLeft').addEventListener('click', () => {
+      plane.rotation.y += Math.PI / 16;
+    });
+
+    document.getElementById('rotateRight').addEventListener('click', () => {
+      plane.rotation.y -= Math.PI / 16;
+    });
+
+    document.getElementById('fullScreen').addEventListener('click', () => {
+      const container = document.querySelector('canvas');
+      if (container.requestFullscreen) {
+        container.requestFullscreen();
+      } else if (container.webkitRequestFullscreen) {
+        /* Safari */
+        container.webkitRequestFullscreen();
+      } else if (container.msRequestFullscreen) {
+        /* IE11 */
+        container.msRequestFullscreen();
+      }
+    });
+
+    document.getElementById('depthRange').addEventListener('input', (event) => {
+      depthValue = event.target.value;
+      console.log("Depth : " + depthValue);
+      updateDepth();
+    });
+
+    // let camz;
+
+    document.getElementById('cam').addEventListener('input', (event) => {
+
+      camz = event.target.value;
+      console.log("Camz : " + camz);
+      // camera.position.z = camz;
+      updateCamz();
+
+
+    });
+
+
+
+
+
+
+    function play() {
+
+
+      // Render the first frame onto a canvas
+      renderer.render(scene, camera);
+      const canvas = renderer.domElement;
+
+      // Convert canvas to image with reduced quality (e.g., 0.5)
+      const imgData = canvas.toDataURL('image/jpeg', 0.5); // Specify quality parameter
+
+      // Create an image element and append it to the body
+      const img = document.createElement('img');
+      img.src = imgData;
+      document.body.appendChild(img);
+    }
+
+    document.getElementById('bendRangeX').addEventListener('input', (event) => {
+      bendValueX = event.target.value;
+      bendValueY = event.target.value;
+      updateBend();
+    });
+
+    function updateDepth() {
+      plane.material.uniforms.depthValue.value = depthValue;
+    }
+
+    function updateBend() {
+      plane.material.uniforms.bendValueX.value = bendValueX;
+      plane.material.uniforms.bendValueY.value = bendValueY;
+    }
+
+    function updateCamz() {
+      camera.position.z = camz;
+    }
+
+
+
+
+
+
+    // function init(depthMap, colorImage) {
+    function init(depthMap, colorImage) {
+      scene = new THREE.Scene();
+      // const aspectRatio = window.innerWidth / window.innerHeight;
+      // const aspectRatio = 16 / 9;
+      const frustumSize = 5.6; // Adjust this value as needed
+      camera = new THREE.OrthographicCamera(-frustumSize * aspectRatio / 2, frustumSize * aspectRatio / 2, frustumSize / 2, -frustumSize / 2, 0.1, 1000);
+      renderer = new THREE.WebGLRenderer();
+      // renderer.setSize(window.innerWidth-100, window.innerHeight);
+      // renderer.setSize(quality , 1080);
+      renderer.setSize(quality, (quality) / aspectRatio);
+      // document.body.appendChild(renderer.domElement); // Append renderer to body
+      document.getElementById("container").appendChild(renderer.domElement); // Append renderer to body
+
+      const loader = new THREE.TextureLoader();
+      depthTexture = loader.load(depthMap);
+      colorTexture = loader.load(colorImage);
+
+
+      const shaderMaterial = new THREE.ShaderMaterial({
+        vertexShader: document.getElementById('vertexShader').textContent,
+        fragmentShader: document.getElementById('fragmentShader').textContent,
+        uniforms: {
+          colorMap: { value: colorTexture },
+          depthMap: { value: depthTexture },
+          depthValue: { value: depthValue },
+          bendValueX: { value: bendValueX },
+          bendValueY: { value: bendValueY }
+        }
+      });
+
+      const geometry = new THREE.PlaneGeometry(11, 11 / aspectRatio, quality, (quality) / aspectRatio); // Increase the number of segments for smoother displacement
+      // const geometry = new THREE.PlaneGeometry(20, 20 / aspectRatio, quality, (quality) / aspectRatio); // Increase the number of segments for smoother displacement
+      plane = new THREE.Mesh(geometry, shaderMaterial);
+      scene.add(plane);
+
+      camera.position.z = camz; // Adjust this value to set the distance from the scene
+      console.log("init completyed");
+    }
+
+
+
+
+    document.getElementById('radiusRange').addEventListener('input', (event) => {
+      radius = parseFloat(event.target.value); // Update radius value
+      console.log("Radius : " + radius);
+    });
+
+
+    document.getElementById('lookat').addEventListener('input', (event) => {
+      targetZ = parseFloat(event.target.value); // Update radius value
+      console.log("lookat : " + targetZ);
+    });
+
+
+
+
+
+
+
+
+
+
+    function dataURLtoFile(dataurl, filename) {
+      var arr = dataurl.split(','),
+        mime = arr[0].match(/:(.*?);/)[1],
+        bstr = atob(arr[1]),
+        n = bstr.length,
+        u8arr = new Uint8Array(n);
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+      return new File([u8arr], filename, {
+        type: mime
+      });
+    }
+
+    function screenshotName(i) {
+      if (i < 10) {
+        return "screenshot00" + i.toString() + ".png";
+      } else if (i < 100) {
+        return "screenshot0" + i.toString() + ".png";
+      } else {
+        return "screenshot" + i.toString() + ".png";
+      }
+    }
+
+
+
+
+    let frame = 0;
+
+
+
+
+    // let updateangle = 0.05;
+    let updateangle = 0.05; // Angular velocity to complete one circle in one second
+
+
+
+
+
+    document.getElementById('time').addEventListener('input', (event) => {
+      updateangle = parseFloat(event.target.value); // Update radius value
+      console.log("updateangle : " + updateangle);
+    });
+
+
+
+
+    // Define your desired FPS
+    const targetFPS = 30; // Adjust as needed
+
+    // Calculate the time interval between frames based on the desired FPS
+    const frameInterval = 1000 / targetFPS;
+
+    // Keep track of the time since the last frame
+    let lastFrameTime = 0;
+
+
+
+
+    async function uploadImage(imageData) {
+      if (!imageData) {
+        alert('No image data provided');
+        return;
+      }
+
+      const reader = new FileReader();
+
+      reader.onload = function (event) {
+        const imageData = event.target.result;
+        eel.save_image(imageData);
+      };
+
+      reader.readAsDataURL(imageData);
+    }
+
+
+    let recording = 0;
+
+    function startrec() {
+      angle = 0;
+      recording = 1;
+    }
+
+
+    let thef = 0;
+
+    function animate(currentTime) {
+
+
+      if (recording == 0) {
+
+
+
+
+
+
+
+        // Calculate the time difference since the last frame
+        const deltaTime = currentTime - lastFrameTime;
+
+        // Proceed with animation only if enough time has passed
+        if (deltaTime >= frameInterval) {
+          // Update last frame time
+          lastFrameTime = currentTime;
+
+
+          angle += updateangle; // Update angle for smooth circular motion
+
+          // Check if the camera has completed one full circle
+          if (angle >= Math.PI * 2) { // 2π radians represents one full circle
+            console.log("Camera has completed one full circle.");
+            angle = 0; // Reset angle to start from 0 again
+          }
+
+          // console.log(angle);
+
+          // Calculate camera position in circular motion
+          const centerX = 0; // X-coordinate of the center of the circular path
+          const centerY = 0; // Y-coordinate of the center of the circular path
+          const cameraX = centerX + radius * Math.cos(angle); // Calculate camera X-coordinate
+          const cameraY = centerY + radius * Math.sin(angle); // Calculate camera Y-coordinate
+
+          // Update camera position
+          camera.position.x = cameraX;
+          camera.position.y = cameraY;
+
+          // Calculate the target point for the camera to look at
+          const targetX = centerX;
+          const targetY = centerY;
+          // const targetZ = 1; // Set Z-coordinate of the target point to 0 (center of the plane)
+
+          // Set camera to look at the target point
+          camera.lookAt(targetX, targetY, targetZ);
+
+          // Render the scene
+          renderer.render(scene, camera);
+
+
+          // if (frame < 180) {
+          // var dataurl = renderer.domElement.toDataURL();
+          // var file = dataURLtoFile(dataurl, screenshotName(frame));
+
+
+
+          //   saveAs(file);
+          //   frame += 1;
+          // }
+        }
+
+        // Request the next frame
+        requestAnimationFrame(animate);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      } else {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        // Check if the camera has completed one full circle
+        if (angle >= Math.PI * 2) { // 2π radians represents one full circle
+          console.log("RECORDING STOPPED");
+          angle = 0; // Reset angle to start from 0 again
+          recording = 0;
+          // setInterval(() => {
+          //   eel.movietime(thef)
+          // }, 2000);
+          setTimeout(() => {
+            
+            let wallpaper_name = originaljson[index-1]["color_img"];
+            eel.create_video(wallpaper_name)(function () {
+              console.log("now you have to call the next one");
+              eel.delete_files_in_folder();
+              thef=0;
+              reload();
+              massproduction();
+
+            });
+          }, 10000);
+        } else {
+
+
+          // angle = 0; // Reset angle to start from 0 again
+
+
+
+          console.log(thef);
+
+
+
+          // console.log(angle);
+
+          // Calculate camera position in circular motion
+          const centerX = 0; // X-coordinate of the center of the circular path
+          const centerY = 0; // Y-coordinate of the center of the circular path
+          const cameraX = centerX + radius * Math.cos(angle); // Calculate camera X-coordinate
+          const cameraY = centerY + radius * Math.sin(angle); // Calculate camera Y-coordinate
+
+          // Update camera position
+          camera.position.x = cameraX;
+          camera.position.y = cameraY;
+
+          // Calculate the target point for the camera to look at
+          const targetX = centerX;
+          const targetY = centerY;
+          // const targetZ = 1; // Set Z-coordinate of the target point to 0 (center of the plane)
+
+          // Set camera to look at the target point
+          camera.lookAt(targetX, targetY, targetZ);
+
+          // Render the scene
+          renderer.render(scene, camera);
+
+
+
+          angle += updateangle; // Update angle for smooth circular motion
+
+
+
+          // if (frame < 180) {
+          var dataurl = renderer.domElement.toDataURL();
+          var file = dataURLtoFile(dataurl, screenshotName(frame));
+
+
+          uploadImage(file)
+          //   saveAs(file);
+          //   frame += 1;
+          // }
+
+          thef++;
+          // Request the next frame
+          requestAnimationFrame(animate);
+
+
+
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+
+      }
+
+
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    function getdata() {
+
+
+      const depthFilesend = document.getElementById('depthFile').files[0];
+      const colorFilesend = document.getElementById('colorFile').files[0];
+      let depthname = depthFilesend.name;
+      let colorfilename = colorFilesend.name;
+
+
+      console.log("get data ");
+      console.log("DEPTH FILE : " + depthname);
+      console.log("COLOR IMAGE : " + colorfilename);
+      console.log("DEPTH : " + depthValue);
+      console.log("BEND : " + bendValueX);
+      console.log("CAMZ : " + camz);
+      console.log("TIME : " + updateangle);
+      console.log("RIDIUS : " + radius);
+      console.log("LOOKAT : " + targetZ);
+    }
+
+
+    function adddata(deptharg, bendarg, camzarg, radiusarg, lookatarg, timearg, callback) {
+
+      console.log("addddddddddd calllllllllled");
+      depthValue = deptharg;
+      bendValueX = bendarg;
+      bendValueY = bendarg;
+      camz = camzarg;
+      radius = radiusarg;
+      targetZ = lookatarg;
+      updateangle = timearg;
+      // updateDepth();
+      // updateBend();
+      // updateCamz();
+      document.getElementById("depthRange").value = depthValue;
+      document.getElementById("bendRangeX").value = bendValueX;
+      document.getElementById("cam").value = camz;
+      document.getElementById("time").value = updateangle;
+      document.getElementById("radiusRange").value = radius;
+      document.getElementById("lookat").value = targetZ;
+      setTimeout(function () {
+        callback()
+      }, 5000);
+
+
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+    // NOW PROGRAMMING FOR THE BULK PRODUCTION
+
+    let index = 1;
+    let depthTexture2, colorTexture2;
+
+
+
+
+    function massproduction() {
+
+      console.log(originaljson);
+      console.log("THE LENGTH OF THE ORIGINALJSON IS : " + Object.keys(originaljson).length);
+      console.log("THE INDEX IS : " + index);
+      
+
+
+      // if () {
+        
+      // }
+
+
+
+      let present_json = originaljson[index];
+      console.log(present_json);
+
+      let present_depth_image_path = "wallpapers/" + originaljson[index]["depth_img"];
+      let present_color_image_path = "wallpapers/" + originaljson[index]["color_img"];
+
+
+      let deptharg = present_json["depth"];
+      let bendarg = present_json["bend"];
+      let camzarg = present_json["camz"];
+      let radiusarg = present_json["radius"];
+      let lookatarg = present_json["lookat"];
+      let timearg = present_json["time"];
+
+      console.log(deptharg + " | " + bendarg + " | " + camzarg + " | " + radiusarg + " | " + lookatarg + " | " + timearg);
+
+      loadimagesviaurl(present_depth_image_path, present_color_image_path, adddata(deptharg, bendarg, camzarg, radiusarg, lookatarg, timearg, startrec));
+
+      // eel.create_video();
+      // adddata(deptharg,bendarg,camzarg,radiusarg,lookatarg,timearg)
+
+
+      index++;
+
+
+    }
+
+
+
+
+
+
+
+
+  </script>
+  <script id="vertexShader" type="x-shader/x-vertex">
+    uniform sampler2D depthMap;
+    uniform float depthValue;
+    uniform float bendValueX;
+    uniform float bendValueY;
+    varying vec2 vUv;
+
+    void main() {
+        vUv = uv;
+        vec3 pos = position;
+        float depth = texture2D(depthMap, vUv).r;
+        pos.x *= (1.0 + bendValueX * depth); // Adjust X-coordinate with bend effect
+        pos.y *= (1.0 + bendValueY * depth); // Adjust Y-coordinate with bend effect
+        pos.z = (depth * 2.0 * depthValue - depthValue); // Adjust Z-coordinate with depth
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+    }
+</script>
+  <script id="fragmentShader" type="x-shader/x-fragment">
+    uniform sampler2D colorMap;
+    uniform sampler2D depthMap;
+    varying vec2 vUv;
+
+    void main() {
+        float edgeThreshold = 0.5; // Adjust this threshold to control the edge dilation
+
+        float depth = texture2D(depthMap, vUv).r;
+
+        float leftDepth = texture2D(depthMap, vUv + vec2(-1.0 / 1280.0, 0)).r;
+        float rightDepth = texture2D(depthMap, vUv + vec2(1.0 / 1280.0, 0)).r;
+        float topDepth = texture2D(depthMap, vUv + vec2(0, 1.0 / 720.0)).r;
+        float bottomDepth = texture2D(depthMap, vUv + vec2(0, -1.0 / 720.0)).r;
+
+        if (abs(depth - leftDepth) > edgeThreshold || 
+            abs(depth - rightDepth) > edgeThreshold ||
+            abs(depth - topDepth) > edgeThreshold ||
+            abs(depth - bottomDepth) > edgeThreshold) {
+            // If the depth is an edge pixel, set it to 1.0
+            depth = 1.0; 
+        }
+
+        vec4 color = texture2D(colorMap, vUv);
+        color.a = depth;
+        gl_FragColor = color;
+    }
+</script>
+</body>
+
+</html>
