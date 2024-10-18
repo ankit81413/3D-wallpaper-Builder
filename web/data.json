@@ -1,0 +1,13 @@
+{
+    "1": {
+        "depth_img": "1080p_2024-09-24_17-22-49_2412_depth - Copy.png",
+        "color_img": "2024-09-24_17-22-49_2412 - Copy.png",
+        "depth": 7.55,
+        "bend": 0,
+        "camz": 14,
+        "time": 0.15862,
+        "radius": 0.18066,
+        "lookat": 0.412,
+        "frustum": 5.656
+    }
+}

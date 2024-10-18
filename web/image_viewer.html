@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Viewer</title>
+</head>
+<body>
+    <h2>Image Viewer</h2>
+    <input type="text" id="imageUrlInput" placeholder="Enter Image URL">
+    <button onclick="displayImage()">Display Image</button>
+    <br>
+    <img id="selectedImage" src="#" alt="Selected Image">
+    
+    <script>
+        function displayImage() {
+            var imageUrl = document.getElementById('imageUrlInput').value;
+            var imgElement = document.getElementById('selectedImage');
+            
+            // Set the src attribute of the image element to the provided URL
+            imgElement.src = imageUrl;
+        }
+    </script>
+</body>
+</html>
